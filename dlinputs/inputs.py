@@ -25,7 +25,7 @@ import pylab
 import PIL
 import pylab
 import scipy.ndimage as ndi
-import simplejson
+import json
 from numpy import cos, sin
 import numpy.random as npr
 
@@ -669,11 +669,11 @@ def read_shards(url, shardtype="application/x-tgz", urlpath=None, verbose=True):
         print("# read_shards", url, "base", base)
     if data is None:
         raise Exception("url not found") # FIXME
-    shards = simplejson.loads(data)
+    shards = json.loads(data)
     if shards is None:
         raise Exception("cannot find {} on {}".format(url, urlpath))
     if shardtype is not None and "shardtype" in shards:
-        assert shards["shardtype"] == "application/x-tgz", shards["shardtype"]
+        assert shards["shardtype"] in ["application/x-tgz", "application/x-tar"], shards["shardtype"]
     shards = shards["shards"]
     for s in shards:
         for i in range(len(s)):
@@ -951,7 +951,7 @@ def ittarreader1(archive, check_sorted=True, keys=base_plus_ext):
             warnings.warn("prefix is None for: %s" % (tarinfo.name,))
             continue
         if prefix != current_prefix:
-            if check_sorted and prefix <= current_prefix:
+            if current_prefix is not None and check_sorted and prefix <= current_prefix:
                 raise ValueError("[%s] -> [%s]: tar file does not contain sorted keys" % \
                                  (current_prefix, prefix))
             if current_sample is not None and \
