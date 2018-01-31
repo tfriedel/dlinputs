@@ -22,7 +22,9 @@ import tarfile
 import argparse
 import re
 import glob
-import simplejson
+import json
+import datetime
+from pathlib import Path
 
 parser = argparse.ArgumentParser("""\
 Create a simple shard index in JSON format.
@@ -38,26 +40,28 @@ parser.add_argument("-o", "--output", default=None,
 parser.add_argument("-x", "--extension", default="tgz",
                     help="extension for sharding")
 args = parser.parse_args()
+assert args.extension in ('tgz', 'tar')
 
 def write_descriptor(desc, prefix):
-    descriptor = dict(shardtype="application/x-tgz")
+    descriptor = dict(shardtype="application/x-{}".format(args.extension))
     pattern = prefix+"-[0-9]*[0-9]."+args.extension
     fnames = sorted([os.path.split(x)[1] for x in glob.glob(pattern)])
     descriptor["shards"] = [[x] for x in fnames]
     metadata = {}
-    metadata["shardtime"] = os.popen("date; pwd; hostname; whoami; uname -a").read()
+    metadata["shardtime"] = str(datetime.datetime.now().replace(microsecond=0))
     if args.description is not None:
         metadata["description"] = args.description
     descriptor["metadata"] = metadata
     print("writing", desc)
     with open(desc, "w") as stream:
-        simplejson.dump(descriptor, stream, sort_keys=True, indent=4*" ")
+        json.dump(descriptor, stream, sort_keys=True, indent=4*" ")
 
 if os.path.isdir(args.prefix):
     assert args.output is None
-    files = glob.glob(args.prefix+"/*.tgz")
-    files = [f for f in files if re.search(r".*-[0-9]+.tgz$", f)]
-    prefixes = sorted(list(set(re.sub(r"[-0-9]+.tgz$", "", f) for f in files)))
+    suffix = args.extension
+    files = glob.glob(args.prefix+"/*.{}".format(suffix))
+    files = [f for f in files if re.search(r".*-[0-9]+.{}$".format(suffix), f)]
+    prefixes = sorted(list(set(re.sub(r"-[0-9]+.{}$".format(suffix), "", f) for f in files)))
     for prefix in prefixes:
         desc = prefix+".shards"
         write_descriptor(desc, prefix)
@@ -65,5 +69,5 @@ else:
     if args.output is None:
         desc = args.prefix+".shards"
     elif args.output == "-":
-        desc = "/dev/stdout"
+        desc = sys.stdout
     write_descriptor(desc, args.prefix)
