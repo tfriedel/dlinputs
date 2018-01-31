@@ -6,7 +6,7 @@ import os
 import os.path
 import pprint
 import re
-import StringIO
+import io
 import sys
 import tarfile
 import time
@@ -15,9 +15,8 @@ import numpy as np
 import scipy
 import torch
 import codecs
-from types import NoneType
+NoneType = type(None)
 
-import simplejson
 
 def pildumps(image, format="PNG"):
     """Compress an image and return it as a string.
@@ -29,7 +28,7 @@ def pildumps(image, format="PNG"):
     :param str format: format string accepted by PIL
 
     """
-    result = StringIO.StringIO()
+    result = io.StringIO()
     if image.dtype in [np.dtype('f'), np.dtype('d')]:
         assert np.amin(image) > -0.001 and np.amax(image) < 1.001
         image = np.clip(image, 0.0, 1.0)
@@ -65,7 +64,7 @@ def autoconvert(obj):
         return pildumps(temp)
     elif isinstance(obj, (str, buffer)):
         return obj
-    elif isinstance(obj, unicode):
+    elif isinstance(obj, str):
         return codecs.encode(obj, "utf8")
     else:
         raise Exception("unknown object type: {}".format(type(obj)))
@@ -85,7 +84,7 @@ class TarWriter(object):
         self.names = names
         self.keep_meta = keep_meta
         self.default_converter = default_converter
-        if isinstance(fname, (str, unicode)):
+        if isinstance(fname, str):
             self.stream = open(fname, "wb")
             self.tarstream = tarfile.open(mode="w|gz", fileobj=self.stream)
         else:
@@ -143,7 +142,7 @@ class TarWriter(object):
             ti.mode = 0o666
             ti.uname = "bigdata"
             ti.gname = "bigdata"
-            stream = StringIO.StringIO(v)
+            stream = io.StringIO(v)
             self.tarstream.addfile(ti, stream)
             total += ti.size
         return total

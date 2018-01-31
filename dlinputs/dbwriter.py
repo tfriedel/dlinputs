@@ -29,7 +29,7 @@ class DbWriter(object):
     def __init__(self, fname, tname, **kw):
         self.db = db = sqlite3.connect(fname)
         self.c = c = db.cursor()
-        self.keys = keys = kw.keys()
+        self.keys = keys = list(kw.keys())
         decls = []
         cols = []
         vals = []
@@ -50,7 +50,7 @@ class DbWriter(object):
             tname=tname, cols=cols, vals=vals)
 
     def add_dict(self, d):
-        d = {k: self.converters[k](v) for k, v in d.items()}
+        d = {k: self.converters[k](v) for k, v in list(d.items())}
         self.c.execute(self.insert, d)
         self.db.commit()
 

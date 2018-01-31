@@ -12,11 +12,11 @@ import os.path
 import random as pyr
 import re
 import sqlite3
-import StringIO
+import io
 import tarfile
 import types
-import urllib2
-import urlparse
+import urllib.request, urllib.error, urllib.parse
+import urllib.parse
 import warnings
 from collections import namedtuple
 
@@ -29,7 +29,7 @@ import simplejson
 from numpy import cos, sin
 import numpy.random as npr
 
-from decorators import itfilter, itmapper, itsink, itsource, prints, ComposableIterator
+from .decorators import itfilter, itmapper, itsink, itsource, prints, ComposableIterator
 
 
 ###
@@ -59,15 +59,15 @@ def find_directory(path, target="", tests=[], verbose=False, error=True):
         if not os.path.isdir(root):
             continue
         candidate = os.path.join(root, target)
-        if verbose: print "trying", candidate
+        if verbose: print("trying", candidate)
         if not os.path.isdir(candidate):
             continue
         failed = False
         for extra in tests:
             testpath = os.path.join(candidate, extra)
-            if verbose: print "testing", testpath
+            if verbose: print("testing", testpath)
             if not os.path.exists(testpath):
-                if verbose: print "FAILED"
+                if verbose: print("FAILED")
                 failed = True
                 break
         if failed: continue
@@ -94,13 +94,13 @@ def find_file(path, target, tests=[], verbose=False, error=True):
         if not os.path.isdir(root):
             continue
         candidate = os.path.join(root, target)
-        if verbose: print "trying", candidate
+        if verbose: print("trying", candidate)
         if not os.path.isfile(candidate):
             continue
         failed = False
         for extra in tests:
             if not extra(candidate):
-                if verbose: print "FAILED"
+                if verbose: print("FAILED")
                 failed = True
                 break
         if failed: continue
@@ -228,7 +228,7 @@ def invert_mapping(kvp):
     :rtype: dictionary
 
     """
-    return {v: k for k, v in kvp.items()}
+    return {v: k for k, v in list(kvp.items())}
 
 def get_string_mapping(kvp):
     """Returns a dictionary mapping strings to strings.
@@ -242,10 +242,10 @@ def get_string_mapping(kvp):
     """
     if kvp is None:
         return {}
-    if isinstance(kvp, (str, unicode)):
+    if isinstance(kvp, str):
         return {k: v for k, v in [kv.split("=", 1) for kv in kvp.split(":")]}
     elif isinstance(kvp, dict):
-        for k, v in kvp.items():
+        for k, v in list(kvp.items()):
             assert isinstance(k, str)
             assert isinstance(v, str)
         return kvp
@@ -286,7 +286,7 @@ def pilreads(data, color, asfloat=True):
 
     """
     assert color is not None
-    return pilread(StringIO.StringIO(data), color=color, asfloat=asfloat)
+    return pilread(io.BytesIO(data), color=color, asfloat=asfloat)
 
 
 pilgray = ft.partial(pilreads, color="gray")
@@ -329,7 +329,7 @@ def pildumps(image, format="PNG"):
     :param format: compression format ("PNG" or "JPEG")
 
     """
-    result = StringIO.StringIO()
+    result = io.StringIO()
     if image.dtype in [np.dtype('f'), np.dtype('d')]:
         assert np.amin(image) > -0.001 and np.amax(image) < 1.001
         image = np.clip(image, 0.0, 1.0)
@@ -363,7 +363,7 @@ def make_distortions(size, distortions=[(5.0, 3)]):
         deltas *= maxdist / r
         total += deltas
     deltas = total
-    xy = np.array(np.meshgrid(range(h),range(w))).transpose(0,2,1)
+    xy = np.array(np.meshgrid(list(range(h)),list(range(w)))).transpose(0,2,1)
     coords = deltas + xy
     return coords
 
@@ -497,12 +497,12 @@ def samples_to_batch(samples, tensors=True):
     :rtype: dict
 
     """
-    result = {k: [] for k in samples[0].keys()}
+    result = {k: [] for k in list(samples[0].keys())}
     for i in range(len(samples)):
-        for k in result.keys():
+        for k in list(result.keys()):
             result[k].append(samples[i][k])
     if tensors == True:
-        tensors = [x for x in result.keys()
+        tensors = [x for x in list(result.keys())
                    if isinstance(result[x][0], (np.ndarray, int, float))]
     for k in tensors:
         result[k] = np.array(result[k])
@@ -584,12 +584,12 @@ def read_url_path(url, urlpath, verbose=False):
     if urlpath is None:
         urlpath = [re.sub("[^/]+$", "", url)]
     for base in urlpath:
-        trial = urlparse.urljoin(base, url)
-        if verbose: print "trying: {}".format(trial)
+        trial = urllib.parse.urljoin(base, url)
+        if verbose: print("trying: {}".format(trial))
         try:
             return openurl(trial).read(), base
-        except urllib2.URLError:
-            if verbose: print trial, ": FAILED"
+        except urllib.error.URLError:
+            if verbose: print(trial, ": FAILED")
             continue
     return None
 
@@ -611,12 +611,12 @@ def findurl(url):
     """
     rewriter = os.environ.get("DLP_URLREWRITER", None)
     if rewriter is not None:
-        execfile(rewriter)
+        exec(compile(open(rewriter).read(), rewriter, 'exec'))
     if url_rewriter is not None:
         url = url_rewriter(url)
     base = os.environ.get("DLP_URLBASE", None)
     if base is not None:
-        url = urlparse.urljoin(base, url)
+        url = urllib.parse.urljoin(base, url)
     return url
 
 
@@ -629,7 +629,7 @@ def openurl(url):
 
     """
     url = findurl(url)
-    return urllib2.urlopen(url)
+    return urllib.request.urlopen(url)
 
 
 def find_url(paths, extra=None):
@@ -647,7 +647,7 @@ def find_url(paths, extra=None):
         if extra is not None:
             test = urllib2.urljoin(path, extra)
         try:
-            urllib2.urlopen(test)
+            urllib.request.urlopen(test)
             return path
         except:
             pass
@@ -666,7 +666,7 @@ def read_shards(url, shardtype="application/x-tgz", urlpath=None, verbose=True):
     """
     data, base = read_url_path(url, urlpath, verbose=verbose)
     if verbose:
-        print "# read_shards", url, "base", base
+        print("# read_shards", url, "base", base)
     if data is None:
         raise Exception("url not found") # FIXME
     shards = simplejson.loads(data)
@@ -677,7 +677,7 @@ def read_shards(url, shardtype="application/x-tgz", urlpath=None, verbose=True):
     shards = shards["shards"]
     for s in shards:
         for i in range(len(s)):
-            s[i] = urlparse.urljoin(base, s[i])
+            s[i] = urllib.parse.urljoin(base, s[i])
     return shards
 
 def extract_shards(url):
@@ -695,7 +695,7 @@ def extract_shards(url):
     f = len(shards) - 1
     n = int(shards[1:])
     result = []
-    for i in xrange(n):
+    for i in range(n):
         result.append("%s%0*d%s" % (prefix, f, i, suffix))
     return result
 
@@ -720,7 +720,7 @@ def iterate_shards(url):
     f = len(shards) - 1
     n = int(shards[1:])
     result = []
-    for i in xrange(n):
+    for i in range(n):
         index = "%0*d" % (f, i)
         yield ShardEntry(prefix+index+suffix, prefix, index, suffix)
 
@@ -750,7 +750,7 @@ def itrepeat(source, nrepeats=int(1e9)):
     :returns: iterator over `nrepeats` repeats of `source`
 
     """
-    for i in xrange(nrepeats):
+    for i in range(nrepeats):
         data = source()
         for sample in data:
             yield sample
@@ -791,9 +791,9 @@ def itdirtree(top, extensions, epochs=1,
         extensions = extensions.split(",")
     assert os.path.isdir(top)
     lines = list(find_basenames(top, extensions))
-    if verbose: print "got {} samples".format(len(lines))
+    if verbose: print("got {} samples".format(len(lines)))
     check_ds_size(lines, size)
-    for epoch in xrange(epochs):
+    for epoch in range(epochs):
         if shuffle: pyr.shuffle(lines)
         for fname in lines:
             result = {}
@@ -824,10 +824,10 @@ def itbasenames(basenamefile, extensions, split=True, epochs=1,
     root = os.path.abspath(basenamefile)
     root = os.path.dirname(root)
     with open(basenamefile, "r") as stream:
-        lines = [line.strip() for line in stream.xreadlines()]
-    if verbose: print "got {} samples".format(len(lines))
+        lines = [line.strip() for line in stream]
+    if verbose: print("got {} samples".format(len(lines)))
     check_ds_size(lines, size)
-    for epoch in xrange(epochs):
+    for epoch in range(epochs):
         if shuffle: pyr.shuffle(lines)
         for fname in lines:
             if split:
@@ -868,16 +868,16 @@ def ittabular(table, colnames, separator="\t", maxerrors=100, encoding="utf-8",
     root = os.path.dirname(root)
     with codecs.open(table, "r", encoding) as stream:
         lines = stream.readlines()
-    if verbose: print "got {} samples".format(len(lines))
+    if verbose: print("got {} samples".format(len(lines)))
     check_ds_size(lines, size)
-    for epoch in xrange(epochs):
+    for epoch in range(epochs):
         if shuffle: pyr.shuffle(lines)
         for line in lines:
             line = line.strip()
             if line[0] == "#": contine
             fnames = line.split(separator)
             if len(fnames) != len(colnames):
-                print "bad input: {}".format(line)
+                print("bad input: {}".format(line))
                 if nerrors > maxerrors:
                     raise ValueError("bad input")
                 nerrors += 1
@@ -890,7 +890,7 @@ def ittabular(table, colnames, separator="\t", maxerrors=100, encoding="utf-8",
                 else:
                     path = os.path.join(root, value)
                     if not os.path.exists(path):
-                        print "{}: not found".format(path)
+                        print("{}: not found".format(path))
                         if nerrors > maxerrors:
                             raise ValueError("not found")
                         nerrors += 1
@@ -929,7 +929,7 @@ def ittarreader1(archive, check_sorted=True, keys=base_plus_ext):
     """
     if isinstance(archive, str):
         if re.match(r"^(https?|file|s?ftp):(?i)", archive):
-            archive = urllib2.urlopen(archive)
+            archive = urllib.request.urlopen(archive)
         elif re.match(r"^gs:(?i)", archive):
             archive = os.popen("gsutil cat '%s'" % archive, "rb")
     current_count = 0
@@ -961,15 +961,15 @@ def ittarreader1(archive, check_sorted=True, keys=base_plus_ext):
             current_sample = dict(__key__=prefix)
         try:
             data = stream.extractfile(tarinfo).read()
-        except tarfile.ReadError, e:
-            print "tarfile.ReadError at", current_count
-            print "file:", tarinfo.name
-            print e
+        except tarfile.ReadError as e:
+            print("tarfile.ReadError at", current_count)
+            print("file:", tarinfo.name)
+            print(e)
             current_sample["__bad__"] = True
         else:
             current_sample[suffix] = data
             current_count += 1
-    if len(current_sample.keys()) > 0:
+    if len(list(current_sample.keys())) > 0:
         yield current_sample
     try: del stream
     except: pass
@@ -979,7 +979,7 @@ def ittarreader1(archive, check_sorted=True, keys=base_plus_ext):
 
 @itsource
 def ittarreader(archive, epochs=1, **kw):
-    for epoch in xrange(epochs):
+    for epoch in range(epochs):
         source = ittarreader1(archive, **kw)
         for sample in source:
             sample["__epoch__"] = epoch
@@ -1007,21 +1007,21 @@ def ittarshards(url, shardtype="application/x-tgz", randomize=True, epochs=1,
         shards = [[s] for s in shards]
     assert isinstance(shards, list)
     assert isinstance(shards[0], list)
-    for epoch in xrange(epochs):
+    for epoch in range(epochs):
         l = list(shards)
         if randomize:
             pyr.shuffle(l)
         for s in l:
             u = pyr.choice(s)
             if verbose:
-                print "# reading", s
+                print("# reading", s)
             try:
                 for item in ittarreader(u):
                     item["__shard__"] = u
                     item["__epoch__"] = epoch
                     yield item
             except tarfile.ReadError:
-                print "read error in:", u
+                print("read error in:", u)
 
 @itsource
 def itsqlite(dbfile, table="train", epochs=1, cols="*", extra="", verbose=False):
@@ -1045,10 +1045,10 @@ def itsqlite(dbfile, table="train", epochs=1, cols="*", extra="", verbose=False)
     assert os.path.exists(dbfile)
     sql = "select %s from %s %s" % (cols, table, extra)
     if verbose:
-        print "#", sql
-    for epoch in xrange(epochs):
+        print("#", sql)
+    for epoch in range(epochs):
         if verbose:
-            print "# epoch", epoch, "dbfile", dbfile
+            print("# epoch", epoch, "dbfile", dbfile)
         db = sqlite3.connect(dbfile)
         c = db.cursor()
         for row in c.execute(sql):
@@ -1073,7 +1073,7 @@ def itbookdir(bookdir, epochs=1, shuffle=True):
     assert os.path.isdir(bookdir), bookdir
     fnames = glob.glob(bookdir + "/????/??????.gt.txt")
     fnames.sort()
-    for epoch in xrange(epochs):
+    for epoch in range(epochs):
         if shuffle: pyr.shuffle(fnames)
         for fname in fnames:
             base = re.sub(".gt.txt$", "", fname)
@@ -1104,7 +1104,7 @@ def itmerge(sources, weights=None):
     while len(sources) > 0:
         index = pyr.randint(0, len(sources)-1)
         try:
-            sample = sources[index].next()
+            sample = next(sources[index])
         except StopIteration:
             del sources[index]
         yield sample
@@ -1142,17 +1142,17 @@ def print_sample(sample):
     """
     for k in sorted(sample.keys()):
         v = sample[k]
-        print k,
+        print(k, end=' ')
         if isinstance(v, np.ndarray):
-            print v.dtype, v.shape
-        elif isinstance(v, (str, unicode)):
-            print repr(v)[:60]
+            print(v.dtype, v.shape)
+        elif isinstance(v, str):
+            print(repr(v)[:60])
         elif isinstance(v, (int, float)):
-            print v
+            print(v)
         elif isinstance(v, buffer):
-            print type(v), len(v)
+            print(type(v), len(v))
         else:
-            print type(v), repr(v)[:60]
+            print(type(v), repr(v)[:60])
 
 @itfilter
 def itinfo(data, every=0):
@@ -1169,7 +1169,7 @@ def itinfo(data, every=0):
     count = 0
     for sample in data:
         if (count == 0 and every == 0) or (every > 0 and count % every == 0):
-            print "# itinfo", count
+            print("# itinfo", count)
             print_sample(sample)
         count += 1
         yield sample
@@ -1193,7 +1193,7 @@ def itgrep(source, **kw):
     for item in source:
         for data in source:
             skip = False
-            for k, v in kw.items():
+            for k, v in list(kw.items()):
                 matching = not not re.search(v, data[k])
                 if matching == _not:
                     skip = True
@@ -1217,7 +1217,7 @@ def itselect(source, **kw):
     for item in source:
         for data in source:
             skip = False
-            for k, f in kw.items():
+            for k, f in list(kw.items()):
                 matching = not not f(data[k])
                 if not matching:
                     skip = True
@@ -1244,17 +1244,17 @@ def itren(data, keep_all=False, keep_meta=True, skip_missing=False, **kw):
         skip = False
         result = {}
         if keep_meta:
-            for k, v in sample.items():
+            for k, v in list(sample.items()):
                 if k[0]=="_":
                     result[k] = v
-        for k, v in kw.items():
+        for k, v in list(kw.items()):
             if v not in sample:
                 skip = True
                 break
             result[k] = sample[v]
         if skip and skip_missing:
             if skip_missing is 1:
-                print v, ": missing field; skipping"
+                print(v, ": missing field; skipping")
                 print_sample(sample)
             continue
         yield result
@@ -1269,8 +1269,8 @@ def itcopy(data, **kw):
 
     """
     for sample in data:
-        result = {k: v for k, v in sample.items()}
-        for k, v in kw.items():
+        result = {k: v for k, v in list(sample.items())}
+        for k, v in list(kw.items()):
             result[k] = result[v]
         yield result
 
@@ -1287,7 +1287,7 @@ def itmap(data, **keys):
     """
     for sample in data:
         sample = sample.copy()
-        for k, f in keys.items():
+        for k, f in list(keys.items()):
             sample[k] = f(sample[k])
         yield sample
 
@@ -1321,7 +1321,7 @@ def itshuffle(data, bufsize=1000):
     buf = []
     for sample in data:
         if len(buf) < bufsize:
-            buf.append(data.next())
+            buf.append(next(data))
         k = pyr.randint(0, len(buf) - 1)
         sample, buf[k] = buf[k], sample
         yield sample
@@ -1372,10 +1372,10 @@ def itunbatch(data):
 
     """
     for sample in data:
-        keys = sample.keys()
+        keys = list(sample.keys())
         bs = len(sample[keys[0]])
-        for i in xrange(bs):
-            yield {k: maybe_index(v, i) for k, v in sample.items()}
+        for i in range(bs):
+            yield {k: maybe_index(v, i) for k, v in list(sample.items())}
 
 @itfilter
 def itslice(*args):
@@ -1543,7 +1543,7 @@ def maketarget(s, codec=ascii_codec):
     :returns: hot one encoding of string
 
     """
-    assert isinstance(s, (str, unicode)), (type(s), s)
+    assert isinstance(s, str), (type(s), s)
     codes = codec.encode(s)
     n = codec.size()
     return intlist_to_hotonelist(codes, n)
@@ -1577,7 +1577,7 @@ def itbatchedbuckets(data, batchsize=5, scale=1.8, seqkey="input", batchdim=1):
         l = seq.shape[batchdim]
         r = int(math.floor(math.log(l) / math.log(scale)))
         batched = buckets.get(r, {})
-        for k, v in sample.items():
+        for k, v in list(sample.items()):
             if k in batched:
                 batched[k].append(v)
             else:
@@ -1587,7 +1587,7 @@ def itbatchedbuckets(data, batchsize=5, scale=1.8, seqkey="input", batchdim=1):
             yield batched
             batched = {}
         buckets[r] = batched
-    for r, batched in buckets.items():
+    for r, batched in list(buckets.items()):
         if batched == {}: continue
         batched["_bucket"] = r
         yield batched
@@ -1668,13 +1668,13 @@ def batchinfo(data, n=1):
     for i, sample in enumerate(data):
         if i >= n:
             break
-        print type(sample)
-        for k, v in sample.items():
-            print k, type(v),
+        print(type(sample))
+        for k, v in list(sample.items()):
+            print(k, type(v), end=' ')
             if isinstance(v, np.ndarray):
-                print v.shape, np.amin(v), np.mean(v), np.amax(v),
-            print
-        print
+                print(v.shape, np.amin(v), np.mean(v), np.amax(v), end=' ')
+            print()
+        print()
 
 
 gen = ComposableIterator

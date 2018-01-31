@@ -2,7 +2,7 @@
 # Copyright (c) 2017 NVIDIA CORPORATION. All rights reserved.
 # See the LICENSE file for licensing terms (BSD-style).
 
-from __future__ import print_function
+
 
 import glob
 import os
@@ -10,11 +10,11 @@ import os.path
 import sys
 import time
 import traceback
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from distutils.core import setup  # , Extension, Command
 
-assert sys.version_info[0] == 2 and sys.version_info[1] >= 7,\
-    "requires Python version 2.7 or later, but not Python 3.x"
+assert sys.version_info[0] == 3 and sys.version_info[1] >= 5,\
+    "requires Python version 3.x"
 
 
 scripts = """
