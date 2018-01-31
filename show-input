@@ -32,33 +32,33 @@ def print_sample(sample):
     for k in keys:
         v = sample[k]
         if isinstance(v, (int, float, str)):
-            print "%15s %s" % (k, repr(v)[:60])
-        elif isinstance(v, unicode):
-            print "%15s %s" % (k, v.strip().encode("utf-8"))
+            print("%15s %s" % (k, repr(v)[:60]))
+        elif isinstance(v, str):
+            print("%15s %s" % (k, v.strip().encode("utf-8")))
         elif isinstance(v, list):
-            print "%15s %3d %s" % (k, len(v), str(v)[:60])
+            print("%15s %3d %s" % (k, len(v), str(v)[:60]))
         elif isinstance(v, np.ndarray):
-            print "%15s %s [%s,%s] %s(%s)" % (k,
+            print("%15s %s [%s,%s] %s(%s)" % (k,
                                     v.shape, np.amin(v), np.amax(v),
-                                    np.mean(v), np.var(v)**.5)
+                                    np.mean(v), np.var(v)**.5))
         elif isinstance(v, torch.Tensor):
             v = v.cpu().numpy()
-            print "%15s %s [%s,%s] %s(%s)" % (k,
+            print("%15s %s [%s,%s] %s(%s)" % (k,
                                     v.shape, np.amin(v), np.amax(v),
-                                    np.mean(v), np.var(v)**.5)
+                                    np.mean(v), np.var(v)**.5))
         else:
-            print "%15s %s" % (k, type(v))
+            print("%15s %s" % (k, type(v)))
 
 if args.parallel > 0:
     method = "{}_data".format(args.table)
     source = dli.parallel.parallel_load(args.input, method=method, nthreads=args.parallel)
-    print args.input, source
+    print(args.input, source)
 elif args.input.endswith(".py"):
     inputs = dli.loadable.load_input(args.input)
     datasets = [attr[:-5] for attr in sorted(dir(inputs)) if attr.endswith("_data")]
-    print "datasets:", ", ".join(datasets)
-    print "showing:", args.table
-    print
+    print("datasets:", ", ".join(datasets))
+    print("showing:", args.table)
+    print()
     method = "{}_data".format(args.table)
     assert hasattr(inputs, method), \
         "{} does not define {}_data method".format(args.input, args.table)
@@ -72,20 +72,20 @@ elif args.input.endswith(".tgz"):
 else:
     raise Exception("{}: unknown extension".format(args.input))
 
-for i in xrange(args.skip):
-    source.next()
+for i in range(args.skip):
+    next(source)
 
-sample = source.next()
+sample = next(source)
 
 print_sample(sample)
 
 if args.bench > 0:
-    print
+    print()
     start = time.time()
-    for i in xrange(args.bench):
-        source.next()
+    for i in range(args.bench):
+        next(source)
     total = time.time() - start
-    print "sec/sample", total/args.bench
+    print("sec/sample", total/args.bench)
 
 if args.display is not None:
     ion()
@@ -103,4 +103,4 @@ if args.display is not None:
             imshow(data)
         show()
         ginput(1, 1000)
-        sample = source.next()
+        sample = next(source)

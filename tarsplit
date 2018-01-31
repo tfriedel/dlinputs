@@ -23,7 +23,7 @@ if args.training is None:
 if args.testing is None:
     args.testing = re.sub(r"((?:-[0-9]+)?\.tgz)$", r"-test\1", args.input)
 
-print "splitting", args.input, "to", args.training, ",", args.testing
+print("splitting", args.input, "to", args.training, ",", args.testing)
 
 assert args.training != args.input
 assert args.testing != args.input
@@ -32,7 +32,7 @@ training = shardwriter.TarWriter(args.training)
 testing = shardwriter.TarWriter(args.testing)
 
 for i, sample in enumerate(dli.ittarreader(args.input)):
-    if i % 1000 == 0: print i
+    if i % 1000 == 0: print(i)
     key = sample["__key__"]
     if pyr.random() < args.probability:
         testing.write(key, sample)

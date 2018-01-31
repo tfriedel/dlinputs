@@ -42,7 +42,7 @@ def open_next_stream():
         host, dest = args.ssh.split(":")
         if dest == "": dest = "."
         cmd = "ssh '{}' dd of='{}/{}'".format(host, dest, name)
-        print("# piping to:", cmd)
+        print(("# piping to:", cmd))
         mcstream = os.popen(cmd, "wb")
         tarstream = tarfile.open(mode=special_write_mode, fileobj=mcstream)
     elif args.minio:
@@ -50,11 +50,11 @@ def open_next_stream():
             cmd = "dd status=progress | mc pipe %s" % name
         else:
             cmd = "mc pipe %s" % name
-        print("# piping to:", cmd)
+        print(("# piping to:", cmd))
         mcstream = os.popen(cmd, "wb")
         tarstream = tarfile.open(mode=special_write_mode, fileobj=mcstream)
     else:
-        print("# writing", name)
+        print(("# writing", name))
         tarstream = tarfile.open(name, write_mode)
     shard += 1
 
@@ -108,12 +108,12 @@ if __name__ == '__main__':
     all_files.sort()
     start_time = time.time()
     print()
-    print("\n".join(all_files[:20]))
+    print(("\n".join(all_files[:20])))
     print("...")
-    print("#", len(all_files), "files", ("%.1e" % total), "bytes")
-    print("#", "up to", 1 + int(
+    print(("#", len(all_files), "files", ("%.1e" % total), "bytes"))
+    print(("#", "up to", 1 + int(
         max(total / args.shardsize, len(all_files) // args.filecount + 1)),
-          "shards")
+          "shards"))
 
     total = 0
     files_written = 0
@@ -160,4 +160,4 @@ if __name__ == '__main__':
     end_time = time.time()
     megabytes_written = total_bytes_written/(1024*1024)
     duration = end_time - start_time
-    print("written {} MB in {}s at {} MB/s".format(megabytes_written, duration, megabytes_written/duration))
+    print(("written {} MB in {}s at {} MB/s".format(megabytes_written, duration, megabytes_written/duration)))

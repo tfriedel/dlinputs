@@ -49,7 +49,7 @@ def write_descriptor(desc, prefix):
     if args.description is not None:
         metadata["description"] = args.description
     descriptor["metadata"] = metadata
-    print "writing", desc
+    print("writing", desc)
     with open(desc, "w") as stream:
         simplejson.dump(descriptor, stream, sort_keys=True, indent=4*" ")
 

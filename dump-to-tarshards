@@ -38,7 +38,7 @@ for kv in args.names.split(","):
     k, v = kv.split("=", 1)
     names[v] = k
 args.names = names
-print args.names
+print(args.names)
 
 inputs = io.load_input(args.input)
 
@@ -56,5 +56,5 @@ writer = shardwriter.ShardWriter(args.prefix,
                                  shardsize=args.shardsize)
 
 for i, batch in enumerate(source):
-    if i % 1000 == 0: print i
+    if i % 1000 == 0: print(i)
     writer.write("%09d" % i, batch)
