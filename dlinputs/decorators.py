@@ -3,15 +3,11 @@
 
 import itertools
 from functools import wraps
+from collections import Iterable
 
 from decorator import decorator
 
 verbose = True
-
-
-def iterable(x):
-    return hasattr(x, "next") and hasattr(x, "__iter__")
-
 
 class ComposableIterator(object):
     def __init__(self, it):
@@ -24,12 +20,12 @@ class ComposableIterator(object):
         if hasattr(f, "__immediate__"):
             return f.__immediate__(self)
         result = f(self.it)
-        assert iterable(result), "{}: did not yield an iterator".format(f)
+        assert isinstance(result, Iterable), "{}: did not yield an iterator".format(f)
         result = ComposableIterator(result)
         return result
 
-    def next(self):
-        return self.it.next()
+    def __next__(self):
+        return next(self.it)
 
 
 class prints(object):
@@ -39,9 +35,9 @@ class prints(object):
     def __immediate__(self, it):
         for i, x in enumerate(itertools.islice(it, self.n)):
             if isinstance(x, dict):
-                print i, x.keys()
+                print(i, list(x.keys()))
             else:
-                print i, x
+                print(i, x)
 
 
 def itsource(f):
@@ -83,19 +79,19 @@ def itsink(f):
 
 @itsource
 def source0(n=15):
-    for i in xrange(n):
+    for i in range(n):
         yield i
 
 
 @itmapper
 def test1(x, y):
-    print "test1"
+    print("test1")
     return (y, x)
 
 
 @itfilter
 def test2(iter, y):
-    print "test2"
+    print("test2")
     for sample in iter:
-        print "iter"
+        print("iter")
         yield (sample, y)
