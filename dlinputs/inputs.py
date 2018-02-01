@@ -28,7 +28,7 @@ import scipy.ndimage as ndi
 import json
 from numpy import cos, sin
 import numpy.random as npr
-
+from .image_processing import resize_and_pad_file
 from .decorators import itfilter, itmapper, itsink, itsource, prints, ComposableIterator
 
 
@@ -253,15 +253,26 @@ def get_string_mapping(kvp):
         raise ValueError("{}: wrong type".format(type(kvp)))
 
 
-def pilread(stream, color="gray", asfloat=True):
+def pilread(stream, color="gray", desired_size=None, pad=True, format='uint8'):
     """Read an image from a stream using PIL.
 
     :param stream: stream to read the image from
     :param color: "gray", "rgb" or "rgba".
-    :param asfloat: return float image instead of uint8 image
+    :param desired_size: None or desired_size. Will resize image to shape
+                   (desired_size x desired_size) if not None
+    :param pad: if resize != None, use pad=True to resize with padding
+    :param format: one of ['uint8', 'float', 'tf']
+           uint8: image values are 8bit unsigned integers, [0-255]
+           float: image values are floats between [0-1]
+           tf: standard tensorflow model scaling: [-1,1]
 
     """
-    image = PIL.Image.open(stream)
+    if desired_size is None:
+        image = PIL.Image.open(stream)
+    else:
+        assert pad  # @TODO: implement warping/no padding
+        image = resize_and_pad_file(stream, desired_size=desired_size)
+
     result = np.array(image, 'uint8')
     if color is None:
         pass
@@ -273,11 +284,14 @@ def pilread(stream, color="gray", asfloat=True):
         result = make_rgba(result)
     else:
         raise ValueError("{}: unknown color space".format(color))
-    if asfloat:
+    if format=='tf':
+        result = result.astype("f") / 127.5
+        result -= 1.
+    elif format == 'float':
         result = result.astype("f") / 255.0
     return result
 
-def pilreads(data, color, asfloat=True):
+def pilreads(data, color, desired_size=None, pad=True, format='float'):
     """Read an image from a string or buffer using PIL.
 
     :param data: data to be decoded
@@ -286,11 +300,13 @@ def pilreads(data, color, asfloat=True):
 
     """
     assert color is not None
-    return pilread(io.BytesIO(data), color=color, asfloat=asfloat)
+    return pilread(io.BytesIO(data), color=color, desired_size=desired_size,
+                   pad=pad, format=format)
 
 
 pilgray = ft.partial(pilreads, color="gray")
 pilrgb = ft.partial(pilreads, color="rgb")
+pad256 = ft.partial(pilreads, color="rgb", desired_size=256, pad=True, format='tf')
 
 def iminvert(image):
     """Invert the given image.
@@ -1417,7 +1433,7 @@ def itstandardize(sample, size, keys=["image"], crop=0, mode="nearest",
     :param rscale: random scale range
     :param rgamma: random gamma range (no color distortion if None)
     :param cgamma: random color gamma range
-    :returns: standardized szmple
+    :returns: standardized sample
 
     """
     if ralpha is True: ralpha = (-0.2, 0.2)
@@ -1436,6 +1452,20 @@ def itstandardize(sample, size, keys=["image"], crop=0, mode="nearest",
                                        cgamma=cgamma)
     return sample
 
+@itmapper
+def itapply(sample, function, keys=["image"]):
+    """Apply's a function to images in a sample.
+
+    :param sample: sample
+    :param function function which takes one 2d numpy array as input and returns one
+    :param keys: keys for images to be modified
+    :returns: sample with modified image(s)
+
+    """
+    for key in keys:
+        sample[key] = function(
+            sample[key])
+    return sample
 ###
 ### Specialized input pipelines for OCR, speech, and related tasks.
 ###
